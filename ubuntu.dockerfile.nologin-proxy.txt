@@ -1,0 +1,8 @@
+# VERSION   0.1.2
+
+FROM ubuntu_squid
+MAINTAINER Vash Hsu <vash.hsu ~AT~ gmail.com>
+
+ENV default_config    squid.conf
+WORKDIR /etc/squid/
+ENTRYPOINT squid -f ${default_config} && sleep 10 && tail -f /var/log/squid/access.log

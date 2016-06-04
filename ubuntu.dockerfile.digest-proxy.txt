@@ -1,0 +1,8 @@
+# VERSION   0.1.2
+
+FROM ubuntu_squid
+MAINTAINER Vash Hsu <vash.hsu ~AT~ gmail.com>
+
+ENV digest_config     squid.conf.digest
+WORKDIR /etc/squid/
+ENTRYPOINT squid -f ${digest_config} && sleep 10 && tail -f /var/log/squid/access.log

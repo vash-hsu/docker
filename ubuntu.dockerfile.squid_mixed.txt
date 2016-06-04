@@ -1,0 +1,74 @@
+# VERSION   0.1.2
+
+FROM ubuntu
+MAINTAINER Vash Hsu <vash.hsu ~AT~ gmail.com>
+
+ENV default_account   root
+ENV default_password  admin
+
+ENV basic_account    basic
+ENV basic_password   basic
+
+ENV digest_account   digest
+ENV digests_password digest
+
+ENV proxy_fqdm       proxy.local
+ENV realm            hello.world.realm
+ENV default_config   squid.conf
+ENV base_dir         /etc/squid/
+ENV password_basic   /etc/squid/squid.passwd.basic
+ENV password_digest  /etc/squid/squid.passwd.digest
+ENV access_log       /var/log/squid/access.log
+
+# ---------- ---------- ----------
+# change root password
+# ---------- ---------- ----------
+RUN echo "${default_account}:${default_password}" | chpasswd
+
+# ---------- ---------- ----------
+# Install tools
+# Install squid server
+# ---------- ---------- ----------
+RUN apt-get update
+RUN apt-get install -y apache2-utils
+RUN apt-get install -y squid
+
+# ---------- ---------- ----------
+# Create password for Basic Authentication
+# ---------- ---------- ----------
+RUN rm -f ${password_basic}
+RUN /usr/bin/htpasswd -b -c ${password_basic} ${default_account} ${default_password}
+RUN /usr/bin/htpasswd -b    ${password_basic} ${basic_account}   ${basic_password}
+
+# ---------- ---------- ----------
+# Create password for Digest Authentication
+# ---------- ---------- ----------
+RUN (echo -n "${default_account}:${realm}:" && echo -n "${default_account}:${realm}:${default_password}" | md5sum - | cut -d' ' -f1) > ${password_digest}
+RUN (echo -n "${digest_account}:${realm}:" && echo -n "${digest_account}:${realm}:${digests_password}" | md5sum - | cut -d' ' -f1) >> ${password_digest}
+
+# ---------- ---------- ----------
+# update squid.conf
+# ---------- ---------- ----------
+RUN (printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
+'cache deny all' \
+"access_log ${access_log}" \
+"visible_hostname ${proxy_fqdm}" \
+'acl SSL_ports port 443' \
+'acl Safe_ports port 80' \
+'acl Safe_ports port 21' \
+'acl Safe_ports port 443' \
+'acl CONNECT method CONNECT' \
+'http_port 3128' \
+'coredump_dir /var/spool/squid' \
+"auth_param basic program /usr/lib/squid/basic_ncsa_auth ${password_basic}" \
+"auth_param digest program /usr/lib/squid/digest_file_auth -c ${password_digest}" \
+'auth_param digest children 5' \
+"auth_param digest realm ${realm}" \
+'auth_param digest nonce_garbage_interval 5 minutes' \
+'auth_param digest nonce_max_duration 30 minutes' \
+'auth_param digest nonce_max_count 50' \
+'acl auth_users proxy_auth REQUIRED' \
+'http_access allow auth_users') > ${base_dir}/${default_config}
+
+WORKDIR ${base_dir}
+ENTRYPOINT squid -f ${base_dir}/${default_config} && sleep 10 && tail -f /var/log/squid/access.log
