@@ -1,0 +1,33 @@
+# VERSION   0.1.0
+
+FROM ubuntu_squid
+MAINTAINER Vash Hsu <vash.hsu ~AT~ gmail.com>
+
+ENV proxy_fqdm       proxy-dummy-ntlm.local
+ENV realm            hello.world.realm
+ENV base_dir         /etc/squid/
+ENV access_log       /var/log/squid/access.log
+ENV ntlm_config      squid.conf.ntlm
+
+# ---------- ---------- ----------
+# update squid.conf for dummy ntlm
+# ---------- ---------- ----------
+RUN (printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
+'cache deny all' \
+"access_log ${access_log}" \
+"visible_hostname ${proxy_fqdm}" \
+'acl SSL_ports port 443' \
+'acl Safe_ports port 80' \
+'acl Safe_ports port 21' \
+'acl Safe_ports port 443' \
+'acl CONNECT method CONNECT' \
+'http_port 3128' \
+'coredump_dir /var/spool/squid' \
+"auth_param ntlm program /usr/lib/squid/ntlm_fake_auth" \
+"auth_param ntlm children 10" \
+"auth_param ntlm realm ${realm}" \
+'acl auth_users proxy_auth REQUIRED' \
+'http_access deny !auth_users') > ${base_dir}/${ntlm_config}
+
+WORKDIR ${base_dir}
+ENTRYPOINT squid -f ${ntlm_config} && sleep 10 && tail -f /var/log/squid/access.log
